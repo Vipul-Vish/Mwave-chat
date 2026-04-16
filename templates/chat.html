@@ -1,0 +1,229 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mwave - Chat with {{ partner }}</title>
+    <style>
+        :root {
+            --bg-body: #050A10; 
+            --header-color: #075E54;
+            --chat-bg: rgba(11, 20, 26, 0.85); 
+            --sent-msg: #005c4b;
+            --received-msg: #202c33;
+            --text-main: #e9edef;
+            --text-muted: #8696a0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-body);
+
+            background-image: url("/static/mwave_logo.png"), url("/static/mwave_logo.png");
+            background-position: left center, right center;
+            background-repeat: no-repeat;
+            background-size: 35% auto;
+            background-attachment: fixed;
+        }
+
+        @media (max-width: 768px) {
+            body { background-size: 50% auto; }
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 500px;
+            height: 90vh;
+            background-color: var(--chat-bg);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px); /* Glass effect */
+            position: relative;
+            z-index: 10;
+        }
+
+        .chat-header {
+            background-color: var(--header-color);
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .back-btn {
+            color: white;
+            text-decoration: none;
+            font-size: 24px;
+            margin-right: 15px;
+        }
+
+        .partner-info h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .partner-info span {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            /* Chat background pattern (Optional WhatsApp look) */
+            background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
+            background-opacity: 0.05;
+        }
+
+        /* Scrollbar styling */
+        #messages::-webkit-scrollbar { width: 6px; }
+        #messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+        .msg {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 75%;
+            word-wrap: break-word;
+            font-size: 14.5px;
+            line-height: 1.4;
+            color: var(--text-main);
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .sent {
+            align-self: flex-end;
+            background-color: var(--sent-msg);
+            border-top-right-radius: 0;
+        }
+
+        .received {
+            align-self: flex-start;
+            background-color: var(--received-msg);
+            border-top-left-radius: 0;
+        }
+
+        .input-area {
+            padding: 10px 15px;
+            background: #202c33;
+            display: flex;
+            align-items: center;
+        }
+
+        #inp {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 20px;
+            background: #2a3942;
+            color: white;
+            outline: none;
+            font-size: 15px;
+        }
+
+        .send-btn {
+            background: var(--header-color);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-left: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: 0.2s;
+        }
+
+        .send-btn:hover { background: #0a7c6e; transform: scale(1.05); }
+
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <a href="/dashboard" class="back-btn">←</a>
+            <div class="partner-info">
+                <h3>{{ partner }}</h3>
+                <span>online</span>
+            </div>
+        </div>
+
+        <div id="messages">
+            {% for msg in messages %}
+                <div class="msg {{ 'sent' if msg.sender_id == current_user.id else 'received' }}">
+                    {{ msg.content }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="input-area">
+            <input id="inp" type="text" placeholder="Type a message..." autocomplete="off">
+            <button class="send-btn" onclick="send()">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const me = "{{ current_user.username }}";
+        const partner = "{{ partner }}";
+
+        socket.on('connect', () => {
+            socket.emit("join", { username: me, partner: partner });
+        });
+
+        window.send = function() {
+            const input = document.getElementById("inp");
+            if (input.value.trim() !== "") {
+                socket.emit("send_message", { 
+                    sender: me, 
+                    receiver: partner, 
+                    message: input.value 
+                });
+                input.value = "";
+            }
+        };
+
+        socket.on("receive_message", (data) => {
+            const messages = document.getElementById("messages");
+            const div = document.createElement("div");
+            div.className = "msg " + (data.sender === me ? "sent" : "received");
+            div.innerText = data.message;
+            messages.appendChild(div);
+            
+            messages.scrollTop = messages.scrollHeight;
+        });
+
+        document.getElementById("inp").addEventListener("keypress", (e) => {
+            if(e.key === "Enter") window.send();
+        });
+
+
+        const msgDiv = document.getElementById("messages");
+        msgDiv.scrollTop = msgDiv.scrollHeight;
+    </script>
+</body>
+</html>
